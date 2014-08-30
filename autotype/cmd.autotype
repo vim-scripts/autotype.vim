@@ -1,9 +1,10 @@
-{@
-    let a = 3
-    let b = 4
-    for i in range(10)
-        ECHO i
-        BLIN i+3
-        TYPE i.'<'.(a+b).'\r'
-    endfor
-@}
+{% new %}
+{# This is a comment #}
+ECHO {% ECHO 'Hello World '%}
+BLINK {% BLINK! 'Hello World '%}
+APPEND {% APPEND 'Hello World '%}
+INSERT {% INSERT! 'Hello World '%}^_$
+NORMAL{% NORM :BLINK! \<C-R>=123947829347322734972\<CR>\<CR> %}
+
+
+
