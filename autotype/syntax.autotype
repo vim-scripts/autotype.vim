@@ -1,0 +1,30 @@
+{% BLINK 'Start a new file for testing' | new %}
+
+Typing Some Normal Things
+
+Do a Math: 2 + 2 = {{ 2 + 2 }}
+
+Current Time is {{ strftime('%c') }}
+
+A list {{ range(20)  }}
+
+ECHO And BLINK
+
+{% BLIN 'where is the cat' %}
+{% BLIN 'I dont know' %}
+
+  ECHO AND HOTKEY {% ECHO 'Go to Start' | NORM! 0 | ECHO 'TYPE Something' | TYPE 'SOMETHING' | NORM! $ %}
+
+Do more things with command blocks
+{@
+for i in range(10)
+    TYPE 'LINE '.i.'\r'
+endfor
+@}
+
+Inline Commands 
+Yank 
+Something ^_yy
+
+Then Paste 
+^_P
