@@ -1,38 +1,167 @@
-{% BLINK 'Start a new file for testing' | new %}Typing Some Normal Things
-{# One Line Comment #}
-{#
+{# vim:set tw=999 #}
+{@
+    ECHO 'Do Some Preparation'
 
-    This 
-    Is 
-    A 
-    Multi
-    Line
-    Comments
+    if __file__ == __source__
+        norm! gg
+        set scb 
+        new
+        set scb
+    else
+        new
+    endif
 
-#}
-Do a Math: 2 + 2 = {{ 2 + 2 }}
+    norm! ggVGd
+    setf rst
+    set tw=999
+    
+    if exists(":InstantRst")
+        ECHO 'View with InstantRst'
+        InstantRst
+    endif
+@}
+AutoType Syntax Overview
+========================
 
-Current Time is {{ strftime('%c') }}
+This is the ``syntax.autotype`` file for **AutoType**'s syntax overview.
 
-A list {{ range(20)  }}
+Normal
+------
+
+Normal Text are typed directly.
+    Works as inserted one by one.
+    
+Comments
+--------
+
+Things in comment tags ``{#`` and ``#}`` are comments
+
+They should be the first/last char of a line.
+    
+    !{# This is a comment #}
+    (! are used to prevent parsing here)
+
+    {#  This is a comments block
+        Comments here
+        #}
+
+Commands
+--------
+
+Things inbetween ``!{%`` and ``!%}`` are commands.
+
+It will trigger vim commands in place.
+
+Also some help commands like ``ECHO|NORMAL|INSERT`` are defined.
 
 ECHO AND BLINK
+    Mik: Kim, Where is the cat?
+    {%- BLIN  {'char':'Mik', 'arg':['Kim', '  KIM!!' , 'Where is the cat?']} %}
 
-{% BLIN 'where is the cat' %}
-{% BLIN! 'I don''t know' %}
+    Kim: Emmm.... I don't know.
+    {%- BLIN! {'char':'Kim', 'arg':['Emm.', 'Emm...'  , 'I don''t know'],'hl':'PreProc'} %}
+    
+Move around
+    Insert ``HELLO`` Before ``WORLD``.
 
-  ECHO AND HOTKEY {% ECHO 'Go to Start' | NORM! 0 | ECHO 'TYPE Something' | TYPE 'SOMETHING' | NORM! $ %}
+    WORLD {% ECHO 'GO ^' | NORM ^ | INSERT 'HELLO ' | NORM $ %}
 
-Do more things with command blocks
-{@
-for i in range(10)
-    TYPE 'LINE '.i.'\r'
-endfor
-@}
+Striping new line
+    Use ``-`` in command tags to strip newlines.
 
-Inline Commands 
-Yank 
-Something ^_yy
+    Like ``!{%-`` and ``!-%}``
+    
+        One Line
+        {%- ECHO 'The Two line will concat in One Line'  -%}
+        Two Line
 
-Then Paste 
-^_P
+Command Blocks
+    Things between ``!{@`` and ``!@}``
+    are command block.
+
+    {% let a = 50 -%}
+    Insert {{ a }} Lines,
+    Then insert line numbers::
+
+
+        {@
+            ECHO 'INPUT NEW LINES'
+            let pos = getpos('.')
+            for i in range(a)
+                INSERT 'THIS IS A NEW LINE\n'
+            endfor
+        @}
+
+        {@
+            ECHO 'INPUT LINE NUMBERS'
+            call setpos('.', pos)
+            for i in range(a)
+                INSERT! '     LINE '.printf('%-3d',(i+1)).':'
+                norm! j
+            endfor
+            norm! G$
+            ECHO 'DONE'
+        @}
+    
+    Python can be used in pyhon blocks
+    {@ python
+    # You can access local variables with _
+    print _['__file__']
+
+    # assign a new valiable.
+    import os
+    _['os_name'] = os.name
+    @}
+
+    Os name: {{ os_name }}
+
+Simple commands 
+    Simple command are like ``!^_xxx``
+
+        Copy This Line ``!^_yy`` ^_yy
+
+        Paste here ``!^_p`` ^_p$
+
+    It will consume all following char 
+    till a space or end of line.
+    
+    So to insert a space after a simple command.
+    You must input 2 spaces.
+
+Variables
+---------
+
+Variables are typed in place 
+
+Expressions
+    100 + 99 = {{ 100+99 }}
+
+    strftime('%'): {{ strftime('%c') }}
+
+    list: {{ range(5) }}
+
+You can define variable and use them.
+    let a = 3 {% let a = 3 %}
+
+    a = {{ a }}
+
+    Variables are local to current context.
+
+    To use variables accross sources, 
+    you can use ``g:vars`` and ``b:vars``
+
+Also some context variables can be used
+    __file__: {{ __file__ }}
+
+    __source__: {{ __source__ }}
+
+    __speed__: {{ __speed__ }}
+
+    Total Elapsed Time: {{ localtime() - __time__ }} sec.
+
+    See README for more details.
+ 
+{% BLINK 'Syntax Overview finished, Do Some Clean Up' %}
+{%- set noscb -%}
+{# {%- bw! -%} #}
+{%- set noscb -%}

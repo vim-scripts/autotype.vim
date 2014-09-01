@@ -1,6 +1,7 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
+" OPTS: "{{{
 let s:tempfile = tempname()
 function! s:default(option,value) "{{{
     if !exists(a:option)
@@ -9,7 +10,6 @@ function! s:default(option,value) "{{{
     endif
     return 1
 endfunction "}}}
-
 function! s:set(option,value) "{{{
     " XXX
     " We can not use: let {g:opt_dict.key} = val
@@ -18,37 +18,20 @@ function! s:set(option,value) "{{{
     let {a:option} = a:value
 
 endfunction "}}}
-fun! autotype#init() "{{{
-    let def_list = [
-        \ ["g:autotype_speed", '30'],
-        \ ["g:autotype_syntax_type", 'jinja'],
-        \ ["g:autotype_cursor_aug", '*.rst,<buffer>'],
-        \ ["g:autotype_file_directory", ''],
-        \ ]
-
-
-    for [opt, val] in def_list
-        call s:default(opt, val)
-        unlet val
-    endfor
-
-    let opts = []
-
-    " Basic:
-    " Turtle/ManKind/Swift/Lighting
-    
+fun! s:init_speed() "{{{
     if g:autotype_speed == 'mankind'
-        let speed = 30
+        let s:speed = 30
     elseif g:autotype_speed == 'turtle'
-        let speed = 2
+        let s:speed = 2
     elseif g:autotype_speed == 'swift'
-        let speed = 400
+        let s:speed = 400
     elseif g:autotype_speed == 'lighting'
-        let speed = 30000
+        let s:speed = 30000
     else
-        let speed = str2nr(g:autotype_speed)
+        let s:speed = str2nr(g:autotype_speed)
     endif
-    let spd = speed <= 0 ? 1 : speed
+    let s:speed = s:speed <= 0 ? 1 : s:speed
+    let spd = s:speed
 
     if spd <= 400 
         call s:set("g:autotype_skip_by", 'char')
@@ -82,6 +65,31 @@ fun! autotype#init() "{{{
         unlet val
     endfor
     " echom string(speed_opt)
+endfun "}}}
+fun! autotype#init() "{{{
+    let def_list = [
+        \ ["g:autotype_speed", '30'],
+        \ ["g:autotype_syntax_type", 'jinja'],
+        \ ["g:autotype_cursor_aug", '*.rst,<buffer>'],
+        \ ["g:autotype_file_directory", ''],
+        \ ["g:autotype_global_context", {}],
+        \ ["g:autotype_debug", 0],
+        \ ["g:autotype_default_char", 'AUTOTYPE'],
+        \ ["g:autotype_default_hl", 'ModeMsg'],
+        \ ]
+
+
+    for [opt, val] in def_list
+        call s:default(opt, val)
+        unlet val
+    endfor
+
+    let opts = []
+
+    " Basic:
+    " Turtle/ManKind/Swift/Lighting
+    
+    call s:init_speed()
 
 
     if g:autotype_syntax_type == 'jinja'
@@ -131,20 +139,25 @@ fun! autotype#init() "{{{
     " Only recongnize the ptn start without a preceding '!'
     let s:bgn = g:autotype_syn_cmd_bgn
     let s:end =  g:autotype_syn_cmd_end
-    let s:c_bgn = '!\@<!'.g:autotype_syn_cmd_bgn
-    let s:c_end = '!\@<!'. g:autotype_syn_cmd_end
+    let s:c_bgn = '!\@<!'.g:autotype_syn_cmd_bgn.'\(-\=\)'
+    let s:c_end = '!\@<!\(-\=\)'. g:autotype_syn_cmd_end
     let s:c_once = '!\@<!'.g:autotype_syn_cmd_once
-    let s:cs_bgn = '^'.g:autotype_syn_cmds_bgn.'$'
-    let s:cs_end = '^'.g:autotype_syn_cmds_end.'$'
+    let s:cs_bgn = '^\s*'.g:autotype_syn_cmds_bgn.'\s*$'
+    let s:cs_end = '^\s*'.g:autotype_syn_cmds_end.'\s*$'
     let s:v_bgn = '!\@<!'.g:autotype_syn_var_bgn
     let s:v_end = '!\@<!'.g:autotype_syn_var_end
     let s:cm_bgn = '^\s*!\@<!'.g:autotype_syn_cmt_bgn
     let s:cm_end = '!\@<!'. g:autotype_syn_cmt_end.'\s*$'
+    let s:csp_bgn = '^\s*'.g:autotype_syn_cmds_bgn.'\s\+python\s*$'
+    let s:csp_end = '^\s*'.g:autotype_syn_cmds_end.'\s*$'
 
     " NOTE: include the \s in s:once to ignore input suffix whitespace
     let s:ptn_once = s:c_once .'\([^[:space:]]\+\)\(\s\|$\)'
     let s:ptn_cmd = s:c_bgn.'\(.\{-}\)'.s:c_end
     let s:ptn_var = s:v_bgn.'\(.\{-}\)'.s:v_end
+    " The pattern for strip '\r'
+    let s:ptn_rstrip = '-'.s:end.'\s*$'
+    let s:ptn_lstrip = '^\s*'.s:bgn.'-'
 
     " Syntax usage
     let g:_autotype = {'syn':{}}
@@ -154,47 +167,16 @@ fun! autotype#init() "{{{
     let s:s.var = s:v_bgn.'.\{-}'.s:v_end
     let s:s.cmd_p = s:c_bgn.'\|'.s:c_end
     let s:s.cmd = s:c_bgn.'.\{-}'.s:c_end
-    let s:s.cmds_bgn = s:cs_bgn
-    let s:s.cmds_end = s:cs_end
+    let s:s.code_vim_bgn = s:cs_bgn
+    let s:s.code_vim_end = s:cs_end
+    let s:s.code_python_bgn = s:csp_bgn
+    let s:s.code_python_end = s:csp_end
     let s:s.cmt_bgn = s:cm_bgn
     let s:s.cmt_end = s:cm_end
 
 endfun "}}}
-
-function! s:time() "{{{
-    if has("reltime")
-        return str2float(reltimestr(reltime()))
-    else
-        return localtime()
-    endif
-endfunction "}}}
-fun! s:sleep(t) "{{{
-    let t = str2nr(a:t)
-    if t <= 0
-        " let t = 1
-        return
-    endif
-    exe "sl ".t."m"
-endfun "}}}
-fun! s:echo(str,...) "{{{
-    " Script use this version
-
-    let hl = a:0 ? get(a:1, 'hl', 'ModeMsg') : 'ModeMsg'
-    let t = a:0 ? get(a:1, 't', g:autotype_sleep_echo) 
-                \ : g:autotype_sleep_echo
-
-
-    exe "echohl ". hl
-    echom '[AUTOTYPE] '.a:str
-    redraw
-    echo '[AUTOTYPE]'
-    echohl Normal
-    echon ' '.a:str
-    redraw
-    call s:sleep(t)
-    
-endfun "}}}
-
+"}}}
+" MAIN: "{{{
 fun! s:append(bang, str, ...) abort "{{{
 
     if a:bang == '!'
@@ -204,7 +186,7 @@ fun! s:append(bang, str, ...) abort "{{{
     endif
 
     for au_ptn in split(g:autotype_cursor_aug, ',')
-        sil! noa exec "doau CursorMoved ". au_ptn
+        sil! exec "doau CursorMoved ". au_ptn
     endfor
 
     redraw
@@ -220,7 +202,7 @@ fun! s:insert(bang, str, ...) abort "{{{
     endif
     
     for au_ptn in split(g:autotype_cursor_aug, ',')
-        sil! noa exec "doau CursorMoved ". au_ptn
+        sil! exec "doau CursorMoved ". au_ptn
     endfor
 
     redraw
@@ -228,63 +210,138 @@ fun! s:insert(bang, str, ...) abort "{{{
     call s:sleep(a:0 ? a:1 : g:autotype_sleep_char )
 endfun "}}}
 
-fun! s:type_norm(line) "{{{
+fun! s:type_norm(line, idx) "{{{
     " Type a normal line, by char or by word
     
+    " NOTE: Append Or Insert?
+    " When typing in a line already has charactes.
+    " The append will one char after the first char as typing 'a'
+    "
+    " But it's not the default behavior as typing in vim insert mode
+    "
+    " So we must insert the char if it's the first char of line.
+    " We can get this by it's idx.
+
     let line = a:line
+    let idx = a:idx
+    " XXX 
+    " Still Met some issues with strip tags
+    
+    " We should reset them all when met one.
+    if s:_lstrip == 1 || s:_rstrip == 1
+        let idx = 1
+        let line = substitute(line, '^\s*', '','')
+        let s:_lstrip = 0
+        let s:_rstrip = 0
+    endif
+
 
     if g:autotype_skip_by == 'char'
         let chars = split(line, '.\zs')
         for char in chars
-            call s:append('', char, g:autotype_sleep_char)
+            if idx == 0
+                call s:insert('', char, g:autotype_sleep_char)
+                let idx = 1
+            else
+                call s:append('', char, g:autotype_sleep_char)
+            endif
         endfor
     elseif g:autotype_skip_by == 'word'
         let words = split(line, '[[:space:]]\+\zs')
         for word in words
-            call s:append('', word, g:autotype_sleep_word)
+            if idx == 0
+                call s:insert('', word, g:autotype_sleep_char)
+                let idx = 1
+            else
+                call s:append('', word, g:autotype_sleep_word)
+            endif
         endfor
     else 
-        call s:append('', line, g:autotype_sleep_line)
+        if idx == 0
+            call s:insert('', line, g:autotype_sleep_line)
+            let idx = 1
+        else
+            call s:append('', line, g:autotype_sleep_line)
+        endif
     endif
 endfun "}}}
 
 fun! s:type_cmd(cmd) "{{{
-    let cmd = a:cmd   
+    call extend(l:, s:_ctx)
     try
-        exe cmd
-    catch /^Vim\%((\a\+)\)\=:E/	" catch all Vim errors
-        call s:echo("caught".v:exception,{'hl':'ErrorMsg'})
+        exe a:cmd
+    catch /^Vim\%((\a\+)\)\=:E\|^AUTOTYPE:/	" catch all Vim errors and AutoType errors
+        call s:echo('!', 0, v:exception)
+        call s:echo('!', 0 ,"from line ".s:_ctx.__lnum__.": ".s:_ctx.__line__)
+        if g:autotype_debug == 1 | throw v:exception | endif
     endtry
+    call extend(s:_ctx , l:)
     redraw
     call s:sleep(g:autotype_sleep_cmd)
 endfun "}}}
-fun! s:exe_cmds(cmds) "{{{
+fun! s:exe_cmds(cmds, type) "{{{
     " cmds is a list of lines
-    call writefile(a:cmds, s:tempfile)
-        try
+    try
+        if a:type == 'vim'
+            call writefile([
+                        \'fun! s:_temp()',
+                        \'call extend(l:, g:_autotype_context)']
+                        \+ a:cmds +
+                        \['call extend(g:_autotype_context,l:)',
+                        \'endfun',
+                        \'call s:_temp()'], s:tempfile)
             exe "so " s:tempfile
-        catch /^Vim\%((\a\+)\)\=:E/	" catch all Vim errors
-            call s:echo("caught".v:exception,{'hl':'ErrorMsg'})
-            " break
-        endtry
-    " for cmd in a:cmds
-    "     try
+        elseif a:type == 'python'
+            call writefile([
+                        \'import vim',
+                        \'_ = vim.bindeval("g:_autotype_context")']
+                        \+ a:cmds , s:tempfile)
+            exe "pyfile " s:tempfile
+        else
+            throw 'AUTOTYPE: Unknow Code Type.'
+        endif
+    catch /^Vim\%((\a\+)\)\=:E\|^AUTOTYPE:\|^Exception: AUTOTYPE:/	" catch all Vim errors and AutoType errors
+        call s:echo('!', 0, v:exception)
+        call s:echo('!', 0 ,"from line ".s:_ctx.__lnum__.": ".s:_ctx.__line__)
+        if g:autotype_debug == 1 | throw v:exception | endif
+        " break
+    endtry
+    
+    " NOTE: We can not :execute a 'for' or 'while' .
+    "       See ':h :exe'
+    " call extend(l:, s:_ctx)
+    " try
+    "     for cmd in a:cmds
+    "         " echom cmd
     "         exe cmd
-    "     catch /^Vim\%((\a\+)\)\=:E/	" catch all Vim errors
-    "         call s:echo("caught".v:exception,{'hl':'ErrorMsg'})
-    "         break
-    "     endtry
-    " endfor
+    "     endfor
+    " catch /^Vim\%((\a\+)\)\=:E/	" catch all Vim errors
+    "     call s:echo("caught".v:exception,{'hl':'ErrorMsg'})
+    "     break
+    " endtry
+    " call extend(s:_ctx , l:)
+   
     redraw
     call s:sleep(g:autotype_sleep_word)
 endfun "}}}
 
 fun! s:type_var(var) "{{{
     " Insert the variable in place.
+    call extend(l:, s:_ctx)
     try
-        exe "norm! a".string(eval(a:var))
-    catch /^Vim\%((\a\+)\)\=:E/	" catch all Vim errors
-	    call s:echo("caught".v:exception,{'hl':'ErrorMsg'})
+        let v = eval(a:var)
+        if type(v) == type([]) || type(v) == type({})
+            exe "norm! a".string(v)
+        else
+            exe "norm! a".v
+        endif
+        unlet v
+    catch /^Vim\%((\a\+)\)\=:E\|^AUTOTYPE:/	" catch all Vim errors and AutoType errors
+        call s:echo('!', 0, v:exception)
+        call s:echo('!', 0 ,"from line ".s:_ctx.__lnum__.": ".s:_ctx.__line__)
+        if g:autotype_debug == 1 
+            throw v:exception 
+        endif
     endtry
 endfun "}}}
 
@@ -314,12 +371,12 @@ fun! s:parse_line(line) "{{{
             let end = matchend(line, s:ptn_once)
             " replace the pattern to ignore further catch
             " NOTE: when ptn_once is at EOL, no ! is added at end
-            "
+            let trim_cmd = substitute(_list[1],'^\s*\|\s*$','','g')
             let line = substitute(line, s:ptn_once, '@@\1\2', '')
             call add(parts, 
                     \ {'type': 'cmd',
                     \ 'str': _list[0],
-                    \ 'cmd': 'norm '._list[1], 
+                    \ 'cmd': 'norm '.trim_cmd,
                     \ 'idx':idx,'end':end})
         endif
         
@@ -327,11 +384,12 @@ fun! s:parse_line(line) "{{{
             let _list = matchlist(line, s:ptn_cmd)
             let idx = match(line, s:ptn_cmd)
             let end = matchend(line, s:ptn_cmd)
-            let line = substitute(line, s:ptn_cmd, '@<\1>@', '')
+            let line = substitute(line, s:ptn_cmd, '@<\1\2\3>@', '')
+            let trim_cmd = substitute(_list[2],'^\s*\|\s*$','','g')
             call add(parts,
                         \{'type': 'cmd',
                         \'str':_list[0],
-                        \'cmd':_list[1],
+                        \'cmd':trim_cmd,
                         \'idx':idx,'end':end})
         endif
 
@@ -397,7 +455,14 @@ fun! s:parse_line(line) "{{{
         " {% heelo %}{% eref %}
         "
         " The Second Type should be CMD
-        " >>> echo p[1].type =~ 'cmd'
+        " >>> echo p[1].type == 'cmd'
+        " 1
+        "
+        
+        " Assume This ptn will consume the whole line.
+        " >>> let line = '{%- heelo %}'
+        " >>> let p = s:parse_line(line)
+        " >>> echo len(p) == 1
         " 1
             
         let last_end = sorted_parts[i-1]['end']
@@ -418,25 +483,24 @@ fun! s:parse_line(line) "{{{
 endfun "}}}
 
 fun! s:type_line(line) "{{{
+    " return 0 if this line typed nothing
     let line = a:line
     let parts = s:parse_line(line)
-    " call s:echo(string(parts))
-    "
-    " let e_t = s:time()
-    " let time = printf("%.4f",(e_t-o_t))
-    " echom 'parse' time
+    let _t = 0
 
     for p in parts
         if p['type']  == 'cmd'
             call s:type_cmd(p['cmd'])
         endif
         if p['type']  == 'norm'
-            call s:type_norm(p['str'])
+            call s:type_norm(p['str'], p.idx)
+            let _t = 1
         endif
         if p['type']  == 'var'
             call s:type_var(p['var'])
         endif
     endfor
+    return _t
     
 endfun "}}}
 
@@ -446,32 +510,46 @@ fun! s:type_lines(lines) abort "{{{
     let cmds = []
     let cmd_mode = 0
     let cmt_mode = 0
+
     
-    let end = len(a:lines)
-    for i in range(end)
+    let end = len(a:lines) - 1
+    for i in range(end+1)
         let line = a:lines[i]
+        let s:_ctx.__line__ = line
+        let s:_ctx.__lnum__ = (i+1)
 
-        " let o_t = s:time()
 
-        " lines in ^[^[ are commands
-        if line =~ s:cs_bgn && cmd_mode == 0 && cmt_mode != 1
+        " Command Block
+        if (line =~ s:cs_bgn || line =~ s:csp_bgn ) 
+            \ && cmd_mode == 0 && cmt_mode != 1
             let cmds = []
+            if line =~ s:csp_bgn
+                let cmd_type = 'python'
+            else
+                let cmd_type = 'vim'
+            endif
+            let cmd_indent = matchstr(line, '^\s*')
             let cmd_mode = 1
             continue
         endif
-
-        if line =~ s:cs_end && cmd_mode == 1
-            call s:exe_cmds(cmds)
+        
+        " In fact they are the same...
+        " But put here as user defined may variant.
+        if ( line =~ s:cs_end || line =~ s:csp_end )
+            \&& cmd_mode == 1
+            call s:exe_cmds(cmds, cmd_type)
             let cmd_mode = 0
             continue
         endif
 
         if cmd_mode == 1
+            " remove indent for python block
+            let line = substitute(line, '^'.cmd_indent, '','')
             call add(cmds, line)
             continue
         endif
 
-        " lines in {# are comments, Just escape them
+        " Comments Block
         if line =~ s:cm_bgn && cmt_mode == 0 && cmd_mode != 1
             " A one line comment
             if line =~ s:cm_end
@@ -490,40 +568,182 @@ fun! s:type_lines(lines) abort "{{{
             continue
         endif
 
-        " let t_t = s:time()
-        " let time = printf("%.4f",(t_t-e_t))
-        " echom 'type' time
 
-        call s:type_line(line)
+        let _typed = s:type_line(line)
 
-        if i != (end-1)
-            call s:append('', "\r", g:autotype_sleep_word)
+        " The New Line Control
+        " EOF_LINE: end line which is not in inlcuded file will not return '\r'
+        " LSTRIP: line starts with '{%-' pattern will make last line not return '\r'
+        " RSTRIP: line end with '-%}' pattern will not return '\r'
+        
+        if  i == end  && s:_ctx.__is_included__ != 1
+            continue
+        elseif line =~ s:ptn_rstrip
+            " If current line is rstrip, 
+            " then next line should append 
+            " instead of insert
+            let s:_rstrip = 1
+            continue
+        elseif i != end && a:lines[i+1] =~ s:ptn_lstrip
+            " if next line is lstrip
+            " then next line should append 
+            " instead of insert
+            let s:_lstrip = 1
+            continue
+        else
+            " Warning: APPEND or append
+            " Append '\r' to current cursor postition
+            " This will lead to miskate input with movements.
+            " See Syntax_Overview_ in README
+            
+            " NOTE:  append or insert
+            " To act as Human input,
+            " A line typed nothing we must INSERT the '\r'
+            " Otherwise it will after one existing char on current line.
+            "
+            if _typed
+                call s:append('', "\r", g:autotype_sleep_word)
+            else
+                " NOT _typed. Then this is an empty line
+                " with '\r', so rstrip and lstrip should 
+                " considered
+                " And we will reset them to 0 
+                " if consumed one
+                if s:_lstrip == 1 || s:_rstrip == 1
+                    call s:append('', "\r", g:autotype_sleep_word)
+                    let s:_lstrip = 0
+                    let s:_rstrip = 0
+                else
+                    call s:insert('', "\r", g:autotype_sleep_word)
+                endif
+            endif
+
         endif
 
     endfor
 endfun "}}}
+"}}}
+" MISC:{{{
+function! s:time() "{{{
+    if has("reltime")
+        return str2float(reltimestr(reltime()))
+    else
+        return localtime()
+    endif
+endfunction "}}}
+fun! s:sleep(t) "{{{
+    let t = str2nr(a:t)
+    if t <= 0
+        " let t = 1
+        return
+    endif
+    exe "sl ".t."m"
+endfun "}}}
+fun! s:get_echo_args(bang, count, arg) "{{{
+    if a:bang == '!'
+        let hl = 'ErrorMsg'
+    else
+        let hl = g:autotype_default_hl
+    endif
+    let ct = a:count==-1 ? 0 : a:count==0 ? g:autotype_sleep_echo : (1000*a:count)
 
+    if type(a:arg) == type({})
+        let hl = get(a:arg,'hl', g:autotype_default_hl)
+        let arg = get(a:arg, 'arg', '')
+        let char = get(a:arg, 'char', g:autotype_default_char)
+    else
+        let arg = a:arg
+        let char = 'AUTOTYPE'
+    endif
+
+    if type(arg) ==type([])
+        let strs = arg
+    else
+        let strs= [arg]
+    endif
+    return [hl, ct, char, strs]
+endfun "}}}
+fun! s:echo(bang, count, arg) "{{{
+    " @arg
+    " if arg is a dict,
+    " set hl to arg.hl
+    " then echo the arg.echo
+    " if arg is a list,
+    " loop list item and echo
+    " if arg is a str
+    " echo it
+    "
+    " @bang
+    " set hl to 'ErrorMsg' if is '!'
+    "
+    " @count
+    " when it's 0, then sleep with echo time
+    " when it's -1, then don't sleep
+    " else sleep with the count seconds
+    
+
+    let [hl, ct, char, strs] = s:get_echo_args(a:bang, 
+                                \a:count, a:arg)
+    for str in strs
+        exe "echohl ". hl | echom '['.char.'] '.str | redraw
+        echo '['.char.']' | echohl Normal | echon ' '.str
+        redraw
+        call s:sleep(ct)
+    endfor
+endfun "}}}
+fun! s:blink(bang, count, arg,...) "{{{
+    " blinking version of s:echo
+    
+    let [hl, ct, char, strs] = s:get_echo_args(a:bang, 
+                                \a:count, a:arg)
+
+    let lp = str2nr(ct)/160
+    if lp < 2
+        let lp = 2
+        let bt = 50
+    else
+        let bt = 100
+    endif
+
+    for str in strs
+        exe "echohl ". hl | echom '['.char.'] '.str | redraw
+        for i in range(lp)
+            echohl Normal | echo '['.char.']'
+            echon ' '.str | redraw
+            call s:sleep(bt)
+
+            exe "echohl ". hl | echo '['.char.']'
+            echohl Normal | echon ' '.str | redraw
+            call s:sleep(bt)
+        endfor
+    endfor
+endfun "}}}
+"}}}
+" PORT: "{{{
 fun! autotype#type_file(f) "{{{
 
     call autotype#init()
-
-
+    let t = s:time()
     let f = a:f
-    let o_t = s:time()
+
+    unlet! g:_autotype_context
+    let g:_autotype_context = extend({'__arg__':f,
+                \'__file__': expand('%:p'),
+                \'__speed__': s:speed,
+                \'__include__': [],
+                \'__time__': localtime()}, g:autotype_global_context)
+    let s:_ctx = g:_autotype_context
+
+
 
     try
-
-        if filereadable(f)
-            call s:echo("Typing started.", {'hl': "MoreMsg", 't':0})
-            call s:type_lines(readfile(f))
-
-        else
+        if !filereadable(f)
             " Try to find an autotype file:
             " with autotype extension and under  &rtp
 
             if f == '' 
                 let f = '*.autotype'
-            elseif fnamemodify(f,':e') == ''
+            elseif fnamemodify(f, ':e') == ''
                 let f = f.'.autotype'
             endif
 
@@ -531,33 +751,90 @@ fun! autotype#type_file(f) "{{{
             let files += split(globpath(&rtp, 'autotype/'.f),'\n')
 
             if empty(files)
-                call s:echo("File Not Found, Stop", {'hl': "WarningMsg",'t':1})
+                call s:echo('', -1,
+                        \{'hl': "PreProc",
+                        \'arg': "File Not Found."})
                 return
             elseif len(files) > 1
                 let i = inputlist(['[AutoType] Choose an autotyping source:']+files)
                 if i == 0
-                    call s:echo("No File Choosed, Stop", {'hl': "WarningMsg",'t':1})
+                    call s:echo('', -1 ,  
+                        \{'hl': "WarningMsg",
+                        \'arg': "No File Chosen."})
                     return
                 else
-                    call s:echo("Typing started.",{'hl': "MoreMsg", 't':0})
-                    call s:type_lines(readfile(files[i-1]))
+                    let f = files[i-1]
                 endif
             else
-                call s:echo("Typing started.", {'hl': "MoreMsg", 't':0})
-                call s:type_lines(readfile(files[0]))
+                let f = files[0]
             endif
-            
         endif
+        let f = fnamemodify(f, ':p')
+        let s:_ctx.__source__ = f
+        let s:_ctx.__sourcing__ = f
+        let s:_ctx.__is_included__ = 0
+        call add(s:_ctx.__include__, f)
+        call s:echo("", -1 , "Typing Start")
+        let s:_lstrip = 0
+        let s:_rstrip = 0
+        call s:type_lines(readfile(f))
+
     catch /^Vim:Interrupt$/	" catch interrupts (CTRL-C)
-        call s:echo("Typing Stopped by user.",
-                    \{'hl': "WarningMsg",'t':0})
+        call s:echo("", -1,
+                    \{'arg': "Typing Stopped by user.",
+                    \'hl': "WarningMsg"})
     endtry
 
-    let time = printf("%.3f",(s:time() - o_t))
-    call s:echo("Typing finished. Using " . time . " seconds.",
-                    \{'hl': "MoreMsg", 't':0})
+    let time = printf("%.3f",(s:time() - t))
+    let s:_ctx.__exec_time__ = time
+    call s:echo("",-1,
+                \{"arg": "Typing finished. Using ". time ." seconds.",
+                \'hl': "MoreMsg"})
+
+    unlet! g:autotype_last_context
+    let g:autotype_last_context = copy(s:_ctx)
+    unlet! s:_ctx
 endfun "}}}
 
+fun! autotype#include(f) "{{{
+
+    " INCLUDE Tag
+    if !exists("s:_ctx")
+        throw 'AUTOTYPE: INCLUDE can only be used in Tag/Block.'
+    endif
+    let f = a:f
+
+    if !filereadable(f)
+        if f == '' 
+            let f = '*.autotype'
+        elseif fnamemodify(f,':e') == ''
+            let f = f.'.autotype'
+        endif
+
+        let files = split(globpath(g:autotype_file_directory, f),'\n')
+        let files += split(globpath(&rtp, 'autotype/'.f),'\n')
+
+        if empty(files)
+            call s:echo('', -1, "File:".f." Not Found")
+            return
+        else
+            let f = files[0]
+        endif
+    endif
+
+    if index(s:_ctx.__include__, f) != -1
+        throw 'AUTOTYPE: Recursive include.'
+    endif
+    call s:echo('',0 ,"INCLUDING:".f )
+    call add(s:_ctx.__include__, f)
+    let _s = s:_ctx.__sourcing__
+    let s:_ctx.__sourcing__ = f
+    let s:_ctx.__is_included__ = 1
+    call s:type_lines(readfile(f))
+    let s:_ctx.__is_included__ = 0
+    let s:_ctx.__sourcing__ = _s
+
+endfun "}}}
 fun! autotype#append(bang, line) "{{{
     " NOTE: Use line as Constant-String.
     " Wrap a:bang, and a:line with '"'
@@ -568,41 +845,12 @@ endfun "}}}
 fun! autotype#insert(bang, line) "{{{
     exe 'call s:insert("'.a:bang.'","'.a:line.'")'
 endfun "}}}
-fun! autotype#blink(bang, str,...) "{{{
-    " blinking a:str as plain text.
-    if a:bang == '!'
-        let hl = 'ErrorMsg'
-    else
-        let hl = 'ModeMsg'
-    endif
 
-    exe "echohl ". hl | echom '[AUTOTYPE] '.a:str | redraw
-    for i in range(str2nr(g:autotype_sleep_echo)/160)
-        echohl Normal | echo '[AUTOTYPE]'
-        echon ' '.a:str | redraw
-        call s:sleep(110)
-
-        exe "echohl ". hl | echo '[AUTOTYPE]'
-        echohl Normal | echon ' '.a:str | redraw
-        call s:sleep(110)
-    endfor
+fun! autotype#echo(bang, count, arg) "{{{
+    call s:echo(a:bang, a:count, a:arg)
 endfun "}}}
-fun! autotype#echo(bang, str) "{{{
-    " echo a:str as plain text.
-    " message are added.
-    
-    if a:bang == '!'
-        let hl = 'ErrorMsg'
-    else
-        let hl = 'ModeMsg'
-    endif
-
-    exe "echohl ". hl | echom '[AUTOTYPE] '.a:str | redraw
-    echo '[AUTOTYPE]' | echohl Normal | echon ' '.a:str
-    redraw
-
-    call s:sleep(g:autotype_sleep_echo)
-
+fun! autotype#blink(bang, count, arg) "{{{
+    call s:blink(a:bang, a:count, a:arg)
 endfun "}}}
 fun! autotype#normal(bang, str) "{{{
     " Wrap the string with "" 
@@ -615,17 +863,20 @@ fun! autotype#atp_spd(str) "{{{
         let g:autotype_speed = a:str
     else
         let _l = split('turtle,mankind,swift,lighting', ',')
-        let k = inputlist(['[AutoType] Choose a Speed, Current:'.g:autotype_speed]+_l)
+        let _k = split('2,30,400,30000', ',')
+        let _n = map(range(len(_l)), 'printf(" %-12s",_l[v:val])."| "._k[v:val]')
+        let k = inputlist(['[AutoType] Choose a Speed, Current:'.g:autotype_speed.'|'.s:speed]+_n)
         if k != 0
             let g:autotype_speed = _l[k-1]
         else
-            call s:echo('Abort Speed setup.',{'t':0})
+            call s:echo('',-1, 'Abort Speed Setup.')
             return
         endif
     endif
-    call s:echo('Speed Set to "'.g:autotype_speed.'"',{'t':0})
+    call s:init_speed()
+    call s:echo('', -1, 'Speed Set to "'.g:autotype_speed.'"('.s:speed.')')
 endfun "}}}
-
+"}}}
 
 call autotype#init()
 

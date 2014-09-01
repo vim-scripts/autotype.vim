@@ -1,7 +1,6 @@
 This is a mirror of http://www.vim.org/scripts/script.php?script_id=5013
 
-
-Auto typing in vim.
+An auto typing engine for vim.
 
 image: https://github.com/Rykka/github_things/raw/master/image/autotype.gif
 
